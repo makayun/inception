@@ -1,0 +1,66 @@
+services:
+  db:
+    build:
+      context: ./requirements/mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql-datavolume:/var/lib/mysql
+      - ./requirements/mariadb/conf/my.cnf:/etc/my.cnf:ro
+    restart: unless-stopped
+    networks:
+      - thenet
+
+  wp:
+    build:
+      context: ./requirements/wordpress
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX}
+      DOMAIN_NAME: ${SITE_URL}
+      WORDPRESS_EMAIL: ${WORDPRESS_USER_EMAIL}
+      WORDPRESS_USER: ${WORDPRESS_USER}
+      WORDPRESS_PASSWORD: ${WORDPRESS_USER_PASSWORD}
+      WORDPRESS_ADMIN_USER: ${WORDPRESS_ADMIN_USER}
+      WORDPRESS_ADMIN_PASSWORD: ${WORDPRESS_ADMIN_PASSWORD}
+      WORDPRESS_ADMIN_EMAIL: ${WORDPRESS_ADMIN_EMAIL}
+    depends_on:
+      - db
+    volumes:
+      - ./wp-content:/var/www/html/wp-content
+      - wordpress:/var/www/html
+      - ./requirements/wordpress/conf/www.conf:/etc/php8/php-fpm.d/www.conf:ro
+    restart: unless-stopped
+    networks:
+      - thenet
+
+  nginx:
+    build:
+      context: ./requirements/nginx
+    volumes:
+      - ./requirements/nginx/conf/wp.conf:/etc/nginx/conf.d/wp.conf:ro
+      - ./requirements/nginx/conf/nginx.conf:/etc/nginx/nginx.conf:ro
+      - wordpress:/var/www/html
+      - ./wp-content:/var/www/html/wp-content
+      - ../secrets/ssl:/etc/ssl:ro
+    ports:
+      - '443:443'
+    depends_on:
+      - wp
+    restart: unless-stopped
+    networks:
+      - thenet
+
+volumes:
+  mysql-datavolume:
+  wordpress:
+
+networks:
+  thenet:
+    driver: bridge
